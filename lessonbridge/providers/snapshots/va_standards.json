@@ -1,0 +1,40 @@
+{
+  "status": "summary",
+  "notes": "Strand-level summaries of the Virginia Standards of Learning. English 7 follows the 2017 English SOL numbering; VDOE adopted revised English SOL in 2024 that are being phased in, so codes should be confirmed against the teacher's curriculum documents. Civics & Economics follows the 2015 History and Social Science SOL; a 2023 revision is also being phased in.",
+  "source_urls": {
+    "english": "https://www.doe.virginia.gov/teaching-learning-assessment/k-12-standards-instruction/english-reading-literacy",
+    "civics": "https://www.doe.virginia.gov/teaching-learning-assessment/k-12-standards-instruction/history-and-social-science"
+  },
+  "english": {
+    "grade": 7,
+    "standards": [
+      {"code": "7.1", "strand": "Communication and Multimodal Literacies", "title": "Communication", "description": "Participate in and contribute to conversations, group discussions, and oral presentations; communicate ideas and information orally in an organized and succinct manner."},
+      {"code": "7.2", "strand": "Communication and Multimodal Literacies", "title": "Media literacy", "description": "Identify and demonstrate the relationship between a speaker's verbal and nonverbal messages; analyze media messages, persuasive techniques, and the purpose and audience of a variety of media."},
+      {"code": "7.3", "strand": "Reading", "title": "Vocabulary development", "description": "Apply knowledge of word origins, roots, affixes, figurative language, connotation and context to determine meaning and expand vocabulary."},
+      {"code": "7.4", "strand": "Reading", "title": "Fiction, literary nonfiction, poetry and drama", "description": "Read and demonstrate comprehension of a variety of fictional texts, literary nonfiction, poetry and drama: plot, conflict, characterization, point of view, theme, figurative language, inference and summary."},
+      {"code": "7.5", "strand": "Reading", "title": "Nonfiction texts", "description": "Read and demonstrate comprehension of a variety of nonfiction texts: text structures and features, main idea and supporting details, author's purpose and viewpoint, fact and opinion, drawing conclusions and summarizing."},
+      {"code": "7.6", "strand": "Writing", "title": "Writing in a variety of forms", "description": "Write in a variety of forms to include narrative, expository, persuasive and reflective, with an emphasis on expository and persuasive writing: thesis, organization, elaboration, counterclaims, and transitions."},
+      {"code": "7.7", "strand": "Writing", "title": "Editing", "description": "Self- and peer-edit writing for capitalization, punctuation, spelling, sentence structure, paragraphing and Standard English usage."},
+      {"code": "7.8", "strand": "Research", "title": "Research", "description": "Find, evaluate and select appropriate resources to create a research product; cite sources, avoid plagiarism, and synthesize information."}
+    ]
+  },
+  "civics": {
+    "grade": 7,
+    "standards": [
+      {"code": "CE.1", "strand": "Skills", "title": "Civics and economics skills", "description": "Analyze and interpret primary and secondary sources, maps, charts and political cartoons; evaluate evidence; construct arguments; take informed civic action."},
+      {"code": "CE.2", "strand": "Foundations", "title": "Foundations of American constitutional government", "description": "Fundamental political principles, the Charters of the Virginia Company, the Virginia Declaration of Rights, the Declaration of Independence, the Articles of Confederation, the Virginia Statute for Religious Freedom, the Constitution and the Bill of Rights; the purposes of government; amendments."},
+      {"code": "CE.3", "strand": "Citizenship", "title": "Citizenship", "description": "How citizenship is attained; First Amendment freedoms; duties and responsibilities of citizens; community service and civic participation."},
+      {"code": "CE.4", "strand": "Citizenship", "title": "Personal character traits for civic life", "description": "Trustworthiness, honesty, courtesy, respect for the rights of others, responsibility, accountability, self-reliance, respect for the law, patriotism and decision-making skills."},
+      {"code": "CE.5", "strand": "Political process", "title": "The political process", "description": "Functions of political parties; similarities and differences between parties; the role of the media; campaign finance; voter registration and participation; electing a president and the Electoral College."},
+      {"code": "CE.6", "strand": "Government", "title": "The American constitutional government at the national level", "description": "Structure and powers of the legislative, executive and judicial branches; separation of powers and checks and balances; the lawmaking process; how the national government makes policy."},
+      {"code": "CE.7", "strand": "Government", "title": "The American constitutional government at the state level", "description": "Structure and powers of Virginia's government; the lawmaking process in Virginia; the relationship between state and national governments (federalism); how Virginia makes policy."},
+      {"code": "CE.8", "strand": "Government", "title": "The American constitutional government at the local level", "description": "Structure and powers of local governments; relationship of local government to the state; local lawmaking and policy."},
+      {"code": "CE.9", "strand": "Public policy", "title": "Public policy", "description": "How public policy is made at local, state and national levels; the role of individuals, interest groups and the media; the Virginia State Corporation Commission and regulatory agencies."},
+      {"code": "CE.10", "strand": "Judicial systems", "title": "The judicial systems", "description": "Organization of the US and Virginia court systems; jurisdiction; civil and criminal cases; due process; the rights of the accused; the exercise of judicial review."},
+      {"code": "CE.11", "strand": "Economics", "title": "Economic systems", "description": "Scarcity, resources, choice, opportunity cost, price, incentives, supply and demand, production and consumption; traditional, free market, command and mixed economies; the US economy as mixed."},
+      {"code": "CE.12", "strand": "Economics", "title": "The United States economy", "description": "Types of business organizations and the role of entrepreneurship; circular flow; private financial institutions; global economy and trade."},
+      {"code": "CE.13", "strand": "Economics", "title": "Government's role in the economy", "description": "How government provides public goods and services, promotes competition, regulates, protects consumers and property rights; the Federal Reserve and monetary policy; fiscal policy and taxation."},
+      {"code": "CE.14", "strand": "Economics", "title": "Career planning", "description": "The relationship between education, skills, income and careers; the changing nature of work; personal financial decision-making."}
+    ]
+  }
+}

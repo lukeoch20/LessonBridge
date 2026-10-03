@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block content %}
+<div class="card"><h1 style="margin-top:0">School calendar (LCPS)</h1>
+<p class="muted">Dates marked provisional came from the bundled snapshot because the live calendar could not be retrieved. Confirming them is one touch for the whole list.</p>
+<form method="post" action="/events/confirm"><button type="submit">Confirm all provisional dates</button></form></div>
+<div class="card"><table><tr><th>Date</th><th>Type</th><th>Title</th><th>Status</th></tr>
+{% for e in events %}<tr><td>{{ e.date }}{% if e.end_date %} → {{ e.end_date }}{% endif %}</td><td>{{ e.event_type.value }}</td><td>{{ e.title }}</td><td>{% if e.confirmed %}<span class="badge ok">confirmed</span>{% elif e.needs_confirmation %}<span class="badge warn">provisional</span>{% else %}ok{% endif %}</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

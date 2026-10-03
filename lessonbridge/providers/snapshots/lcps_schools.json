@@ -1,0 +1,23 @@
+{
+  "status": "partial",
+  "notes": "Middle schools in LCPS. Partial snapshot; onboarding also accepts a school name that is not on this list.",
+  "schools": [
+    {"slug": "belmont-ridge-ms", "name": "Belmont Ridge Middle School"},
+    {"slug": "blue-ridge-ms", "name": "Blue Ridge Middle School"},
+    {"slug": "brambleton-ms", "name": "Brambleton Middle School"},
+    {"slug": "eagle-ridge-ms", "name": "Eagle Ridge Middle School"},
+    {"slug": "farmwell-station-ms", "name": "Farmwell Station Middle School"},
+    {"slug": "harmony-ms", "name": "Harmony Middle School"},
+    {"slug": "harper-park-ms", "name": "Harper Park Middle School"},
+    {"slug": "j-michael-lunsford-ms", "name": "J. Michael Lunsford Middle School"},
+    {"slug": "j-l-simpson-ms", "name": "J. L. Simpson Middle School"},
+    {"slug": "mercer-ms", "name": "Mercer Middle School"},
+    {"slug": "river-bend-ms", "name": "River Bend Middle School"},
+    {"slug": "seneca-ridge-ms", "name": "Seneca Ridge Middle School"},
+    {"slug": "smarts-mill-ms", "name": "Smart's Mill Middle School"},
+    {"slug": "sterling-ms", "name": "Sterling Middle School"},
+    {"slug": "stone-hill-ms", "name": "Stone Hill Middle School"},
+    {"slug": "trailside-ms", "name": "Trailside Middle School"},
+    {"slug": "willard-ms", "name": "Willard Middle School"}
+  ]
+}

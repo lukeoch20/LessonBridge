@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block content %}
+<div class="card doc">{{ body|safe }}
+<p>Status: <strong>{{ proposal.status.value }}</strong></p>
+{% if proposal.status.value == 'pending' %}
+<form class="inline" method="post" action="/proposals/{{ proposal.id }}/approve"><button type="submit">Approve — make this the calendar</button></form>
+<form class="inline" method="post" action="/proposals/{{ proposal.id }}/reject"><button class="danger" type="submit">Reject</button></form>
+{% endif %}
+<p><a class="btn secondary" href="/calendar/{{ section.id }}?start={{ proposal.diff[0].date if proposal.diff else '' }}">Open calendar</a> {% if proposal.absence_id %}<a class="btn secondary" href="/absences/{{ proposal.absence_id }}">Back to absence</a>{% endif %}</p>
+</div>
+{% endblock %}
