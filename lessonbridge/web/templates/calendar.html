@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block content %}
+<div class="card"><h1 style="margin:0">{{ section.section_name }}</h1><div class="muted">{{ start }} to {{ end }} · <a href="?start={{ prev }}">« earlier</a> · <a href="?start={{ next }}">later »</a></div></div>
+<div class="card"><table><tr><th>Date</th><th>Entry</th><th>Unit</th><th>Detail</th><th>Status</th><th>Record</th></tr>
+{% for e in entries %}<tr>
+<td>{{ e.date.strftime('%a %b %d') }}</td>
+<td>{{ e.title }} {% if e.is_sub_day %}<span class="badge sub">SUB</span>{% endif %} {% if e.kind.value == 'assessment' %}<span class="badge">assessment</span>{% endif %}{% if e.id in plans %} · <a href="/subplans/{{ plans[e.id] }}">plan</a>{% endif %}{% if e.notes %}<div class="muted" style="font-size:12px">{{ e.notes }}</div>{% endif %}</td>
+<td class="muted">{{ e.unit.title if e.unit else '' }}</td>
+<td class="muted">{{ e.detail_level.value }}</td>
+<td>{% if e.status.value == 'completed' %}<span class="badge ok">completed</span>{% elif e.status.value == 'skipped' %}<span class="badge warn">skipped</span>{% else %}{{ e.status.value }}{% endif %}</td>
+<td>
+<form class="inline" method="post" action="/calendar/{{ section.id }}/mark"><input type="hidden" name="on" value="{{ e.date }}"><select name="status"><option value="completed">completed</option><option value="skipped">skipped</option><option value="planned">planned</option></select> <button class="secondary" type="submit">mark</button></form>
+<form class="inline" method="post" action="/calendar/{{ section.id }}/slip"><input type="hidden" name="on" value="{{ e.date }}"><input type="hidden" name="days" value="1"><button class="secondary" type="submit" title="This lesson needs one more day; propose a repaired schedule">+1 day</button></form>
+</td></tr>{% endfor %}</table></div>
+{% endblock %}

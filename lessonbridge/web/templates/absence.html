@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block content %}
+<div class="card"><h1 style="margin:0">Absence {{ absence.id }} · {{ absence.start_date }} → {{ absence.end_date }}</h1>
+<div class="muted">{{ absence.absence_type.value }} · {{ absence.substitute_type.value }} · {{ absence.status.value }} {% if absence.reason %}· {{ absence.reason }}{% endif %}</div></div>
+<div class="card"><h2 style="margin-top:0">Decisions</h2>
+<table><tr><th>Date</th><th>Decision</th><th>Why</th></tr>{% for d in absence.decisions|sort(attribute='date') %}<tr><td>{{ d.date }}</td><td><span class="badge">{{ d.decision.value }}</span></td><td>{{ d.rationale }}</td></tr>{% endfor %}</table></div>
+<div class="card"><h2 style="margin-top:0">Calendar proposals</h2>
+<table><tr><th>#</th><th>Section</th><th>Status</th><th></th></tr>{% for p in absence.proposals %}<tr><td>{{ p.id }}</td><td>{{ sections[p.teacher_course_id].section_name }}</td><td>{{ p.status.value }}</td><td><a class="btn secondary" href="/proposals/{{ p.id }}">{{ 'Review' if p.status.value == 'pending' else 'View' }}</a></td></tr>{% endfor %}</table></div>
+<div class="card"><h2 style="margin-top:0">Substitute plans</h2>
+<p><form class="inline" method="post" action="/absences/{{ absence.id }}/subplans"><button type="submit">Generate / regenerate daily plans</button></form>
+{% if absence.absence_type.value == 'extended_leave' %}<form class="inline" method="post" action="/absences/{{ absence.id }}/leave"><button class="secondary" type="submit">Build leave packet (analysis, 10-day handoff, weekly frameworks)</button></form>{% endif %}
+<a class="btn secondary" href="/absences/{{ absence.id }}/brief">Return brief</a>{% if leave %} <a class="btn secondary" href="/absences/{{ absence.id }}/leave">Leave packet</a>{% endif %}</p>
+{% if plans %}<table><tr><th>Date</th><th>Section</th><th>Generator</th><th>Validation</th><th></th></tr>
+{% for p in plans %}<tr><td>{{ p.date }}</td><td>{{ p.section.section_name }}</td><td class="muted">{{ p.generator }} ({{ p.attempts }} attempt{{ 's' if p.attempts != 1 }})</td><td>{% if p.status.value == 'accepted' %}<span class="badge ok">passed</span>{% else %}<span class="badge warn">{{ p.status.value }}</span>{% endif %}</td><td><a href="/subplans/{{ p.id }}">open</a></td></tr>{% endfor %}</table>
+{% else %}<p class="muted">No plans generated yet. Approve the proposals first so plans reflect the reconciled calendar.</p>{% endif %}</div>
+{% endblock %}

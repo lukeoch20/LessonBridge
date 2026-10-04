@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block content %}
+<div class="card"><h1 style="margin-top:0">Report an absence</h1>
+<p class="muted">LessonBridge decides per lesson whether to keep, modify, replace, postpone or reorder, repairs the calendar, and shows you a diff before anything changes.</p>
+<form method="post" action="/absences">
+<p><label>First day <input type="date" name="start" required></label> <label>Last day <input type="date" name="end"></label></p>
+<p><label>Substitute <select name="substitute"><option value="">auto (long-term for extended leave)</option><option value="any_sub">day-to-day substitute</option><option value="long_term_sub">long-term substitute</option></select></label></p>
+<p><label>Reason <input name="reason" placeholder="optional"></label></p>
+<p><button type="submit">Plan this absence</button></p></form></div>
+{% endblock %}

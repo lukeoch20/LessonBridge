@@ -1,0 +1,41 @@
+{
+  "district": "lcps",
+  "school_year": "2026-2027",
+  "status": "provisional",
+  "notes": "Bundled snapshot assembled from LCPS's usual calendar pattern. Every date is flagged needs_confirmation until the live calendar at lcps.org is retrieved or the teacher confirms it during onboarding.",
+  "source_url": "https://www.lcps.org/calendar",
+  "events": [
+    {"date": "2026-08-17", "end_date": "2026-08-19", "event_type": "teacher_workday", "title": "Teacher workdays / pre-service", "instructional": false},
+    {"date": "2026-08-20", "event_type": "first_day", "title": "First day of school for students", "instructional": true, "quarter": 1},
+    {"date": "2026-09-07", "event_type": "holiday", "title": "Labor Day", "instructional": false},
+    {"date": "2026-09-21", "event_type": "holiday", "title": "Yom Kippur (schools closed)", "instructional": false},
+    {"date": "2026-10-12", "event_type": "holiday", "title": "Indigenous Peoples' Day (schools closed)", "instructional": false},
+    {"date": "2026-10-30", "event_type": "quarter_end", "title": "End of first quarter", "instructional": true, "quarter": 1},
+    {"date": "2026-11-02", "event_type": "teacher_workday", "title": "Teacher workday (no school for students)", "instructional": false},
+    {"date": "2026-11-03", "event_type": "holiday", "title": "Election Day (schools closed)", "instructional": false},
+    {"date": "2026-11-04", "event_type": "quarter_start", "title": "Second quarter begins", "instructional": true, "quarter": 2},
+    {"date": "2026-11-11", "event_type": "holiday", "title": "Veterans Day (schools closed)", "instructional": false},
+    {"date": "2026-11-24", "event_type": "early_release", "title": "Early release before Thanksgiving", "instructional": true},
+    {"date": "2026-11-25", "end_date": "2026-11-27", "event_type": "holiday", "title": "Thanksgiving break", "instructional": false},
+    {"date": "2026-12-21", "end_date": "2027-01-01", "event_type": "holiday", "title": "Winter break", "instructional": false},
+    {"date": "2027-01-18", "event_type": "holiday", "title": "Martin Luther King Jr. Day", "instructional": false},
+    {"date": "2027-01-22", "event_type": "quarter_end", "title": "End of second quarter", "instructional": true, "quarter": 2},
+    {"date": "2027-01-25", "event_type": "teacher_workday", "title": "Teacher workday (no school for students)", "instructional": false},
+    {"date": "2027-01-26", "event_type": "quarter_start", "title": "Third quarter begins", "instructional": true, "quarter": 3},
+    {"date": "2027-02-15", "event_type": "holiday", "title": "Presidents' Day", "instructional": false},
+    {"date": "2027-03-10", "event_type": "holiday", "title": "Eid al-Fitr (schools closed)", "instructional": false},
+    {"date": "2027-03-26", "event_type": "quarter_end", "title": "End of third quarter", "instructional": true, "quarter": 3},
+    {"date": "2027-03-29", "end_date": "2027-04-02", "event_type": "holiday", "title": "Spring break", "instructional": false},
+    {"date": "2027-04-05", "event_type": "quarter_start", "title": "Fourth quarter begins", "instructional": true, "quarter": 4},
+    {"date": "2027-05-10", "end_date": "2027-06-04", "event_type": "testing_window", "title": "Spring SOL testing window (Reading 7, Civics & Economics)", "instructional": true},
+    {"date": "2027-05-31", "event_type": "holiday", "title": "Memorial Day", "instructional": false},
+    {"date": "2027-06-11", "event_type": "last_day", "title": "Last day of school for students (early release)", "instructional": true, "quarter": 4},
+    {"date": "2027-06-11", "event_type": "quarter_end", "title": "End of fourth quarter", "instructional": true, "quarter": 4}
+  ],
+  "grading_periods": [
+    {"quarter": 1, "start": "2026-08-20", "end": "2026-10-30", "grades_due": "2026-11-04"},
+    {"quarter": 2, "start": "2026-11-04", "end": "2027-01-22", "grades_due": "2027-01-27"},
+    {"quarter": 3, "start": "2027-01-26", "end": "2027-03-26", "grades_due": "2027-04-07"},
+    {"quarter": 4, "start": "2027-04-05", "end": "2027-06-11", "grades_due": "2027-06-15"}
+  ]
+}

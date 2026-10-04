@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% block content %}
+<div class="card"><h1 style="margin-top:0">Onboarding</h1>
+<p class="muted">LessonBridge gathers LCPS public context first. You provide only what is yours: school, grade, subjects, schedule, syllabus and (optionally) a pacing guide. Paste or edit the profile below.</p>
+<form method="post" action="/onboard"><textarea name="profile_yaml">{{ example }}</textarea><p><button type="submit">Build my instructional context</button></p></form></div>
+{% if result %}
+<div class="card"><h2 style="margin-top:0">What LessonBridge found</h2>
+<p>Teacher id {{ result.teacher_id }} · onboarding touches: <strong>{{ result.touches }}</strong></p>
+<ul>
+<li>Public sources: {{ result.public_sources|join(', ') or 'already current' }}</li>
+<li>School-calendar dates needing confirmation: {{ result.flagged_events|length }} (<a href="/events">review</a>)</li>
+{% for subj, src in result.curriculum_sources.items() %}<li>{{ subj }}: curriculum from {{ src }}</li>{% endfor %}
+{% for name, rep in result.build_reports.items() %}<li>{{ name }}: {{ rep.entries_created }} course-days planned ({{ rep.flex_days }} flex / to-be-detailed){% if rep.quarter_overruns %} · <span class="badge warn">{{ rep.quarter_overruns|length }} quarter overruns</span>{% endif %}</li>{% endfor %}
+{% for c in result.curriculum_conflicts %}<li><span class="badge warn">conflict</span> {{ c }}</li>{% endfor %}
+{% for n in result.curriculum_notes %}<li class="muted">{{ n }}</li>{% endfor %}
+{% for w in result.warnings %}<li style="color:#c92a2a">{{ w }}</li>{% endfor %}
+</ul>
+{% if result.extracted_rules %}<h3>Rules learned from your documents</h3><ul>{% for r in result.extracted_rules %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}
+<p><a class="btn" href="/">Review the draft calendar</a></p></div>
+{% endif %}
+{% endblock %}
