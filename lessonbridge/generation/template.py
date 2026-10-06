@@ -2,8 +2,9 @@
 
 Used when Claude is not configured, as the fallback when generation fails
 validation repeatedly, and in tests. It builds plans from lesson metadata,
-teacher rules and the replacement library, so output is always grounded in
-real materials and passes the quality gate by construction.
+teacher rules and the replacement library, so output is grounded in real
+materials and passes the quality gate for every lesson type, substitute type
+and period length (LB-38).
 """
 from __future__ import annotations
 
@@ -11,17 +12,28 @@ from typing import Any
 
 from ..schemas import SubPlanContent
 
+STAPLES = ("paper", "pencils", "independent reading books", "seating chart")
 
-def _steps_sum_to(steps: list[tuple[str, int]], total: int) -> list[str]:
-    """Adjust the largest step so the minutes add up to ``total`` exactly."""
-    steps = [list(s) for s in steps if s[1] > 0]
-    diff = total - sum(m for _, m in steps)
-    if diff != 0:
-        idx = max(range(len(steps)), key=lambda i: steps[i][1])
-        steps[idx][1] = max(5, steps[idx][1] + diff)
-        diff = total - sum(m for _, m in steps)
-        if diff:  # second pass if clamped
-            steps[idx][1] += diff
+
+def _fit(fixed: list[tuple[str, int]], work_index: int, total: int) -> list[tuple[str, int]]:
+    """Give the work step whatever time remains; shrink admin steps (never a rule-mandated step) on short periods."""
+    steps = [list(s) for s in fixed]
+    others = sum(m for i, (_, m) in enumerate(steps) if i != work_index)
+    remaining = total - others
+    if remaining < 5:
+        # Short period: admin steps (attendance, collection, cleanup) give way first, down to 1 minute each.
+        for i, (text, m) in enumerate(steps):
+            if i == work_index or "study" in text.lower():
+                continue
+            while m > 1 and remaining < 5:
+                m -= 1
+                remaining += 1
+            steps[i][1] = m
+    steps[work_index][1] = max(1, remaining)
+    return [(t, m) for t, m in steps if m > 0]
+
+
+def _number(steps: list[tuple[str, int]]) -> list[str]:
     return [f"{i + 1}. {text} ({m} min)" for i, (text, m) in enumerate(steps)]
 
 
@@ -31,7 +43,7 @@ def generate_template_plan(ctx: dict[str, Any]) -> SubPlanContent:
     rules = ctx.get("rules", [])
     rule_texts = [r["text"] for r in rules]
     materials = list(dict.fromkeys(ctx.get("available_materials", [])))
-    handout = [m for m in materials if m not in ("paper", "pencils", "independent reading books", "seating chart")]
+    handout = [m for m in materials if m not in STAPLES]
     outputs = ctx.get("expected_outputs") or ["completed class work"]
     deliverable = outputs[0]
     title = ctx.get("lesson_title", "Class work")
@@ -39,55 +51,63 @@ def generate_template_plan(ctx: dict[str, Any]) -> SubPlanContent:
     mats_phrase = ", ".join(m.replace("_", " ") for m in handout[:3]) or "the materials on the desk"
     study = next((int(r["structured"].get("minutes", 0)) for r in rules if (r.get("structured") or {}).get("action") == "study_period"), 0)
     early = next((r["text"] for r in rules if (r.get("structured") or {}).get("action") == "early_finisher"), "Early finishers read their independent reading book silently.")
+    admin = 5 if minutes >= 35 else 2
     attendance = "Take attendance using the seating chart and write the objective on the board: " + objective
+    compressed = ctx.get("compressed") or []
 
-    steps: list[tuple[str, int]]
     if ctx.get("is_assessment"):
-        steps = [(attendance, 5)]
+        fixed = [(attendance, admin)]
         if study:
-            steps.append((f"Give students {study} minutes to study silently using their notes or the review sheet (pre-quiz study period).", study))
-        steps.append((f"Distribute {mats_phrase}. Students complete the assessment silently and independently. Do not answer content questions; clarify directions only.", max(15, minutes - 5 - study - 5)))
-        steps.append(("Collect every assessment, count them against the class list, and place them in the tray labeled for the teacher. Students who finish early read silently.", 5))
+            fixed.append((f"Pre-quiz study period: students study silently using their notes or the review sheet for {study} minutes.", study))
+        fixed.append((f"Distribute {mats_phrase}. Students complete the assessment silently and independently. Answer questions about directions only.", 0))
+        fixed.append(("Collect every assessment, count them against the class list, and place them in the tray labeled for the teacher. Students who finish early read silently.", admin))
+        steps = _fit(fixed, len(fixed) - 2, minutes)
     elif ctx.get("kind") == "flex":
         unit = ctx.get("unit") or "this unit"
-        steps = [
-            (attendance, 5),
-            (f"Write on the board what students still owe from earlier in {unit}; students list their own unfinished items and start on them using {mats_phrase}.", 5),
-            ("Catch-up block: students finish unfinished work independently; circulate and check off completed items on the class list.", max(10, (minutes - 20) // 2)),
-            (f"Extension block: students who are finished complete the extension practice ({mats_phrase}); partners may quiz each other on unit vocabulary.", max(10, minutes - 20 - (minutes - 20) // 2)),
-            ("Collect unfinished work and extension practice separately; leave both in the teacher's tray with a note of who finished what.", 5),
+        fixed = [
+            (attendance, admin),
+            (f"Write on the board what students still owe from earlier in {unit}; students list their own unfinished items and start on them using {mats_phrase}.", admin),
+            ("Catch-up block: students finish unfinished work independently; circulate and check off completed items on the class list.", 0),
+            (f"Extension block: students who are finished complete the extension practice ({mats_phrase}); partners may quiz each other on unit vocabulary.", max(1, (minutes - 3 * admin) // 3)),
+            ("Collect unfinished work and extension practice separately; leave both in the teacher's tray with a note of who finished what.", admin),
         ]
+        steps = _fit(fixed, 2, minutes)
     elif ctx.get("kind") == "filler":
         desc = ctx.get("activity_description") or f"Students complete {title}."
-        steps = [
-            (attendance, 5),
-            (f"Distribute {mats_phrase}. Read the directions aloud: {desc}", 5),
-            ("Students work independently and silently; circulate to keep students on task. Clarify directions only.", max(15, minutes - 20)),
-            ("Stop work. Students write their name on the work; collect it and place it in the teacher's tray.", 5),
-            ("Clean up: materials returned to the back table, chairs pushed in, dismiss by rows when the bell rings.", 5),
+        fixed = [
+            (attendance, admin),
+            (f"Distribute {mats_phrase}. Read the directions aloud: {desc}", admin),
+            ("Students work independently and silently; circulate to keep students on task. Answer questions about directions only.", 0),
+            ("Stop work. Students write their name on the work; collect it and place it in the teacher's tray.", admin),
+            ("Clean up: materials returned to the back table, chairs pushed in, dismiss when the bell rings.", min(admin, 3)),
         ]
+        steps = _fit(fixed, 2, minutes)
     elif sub == "long_term_sub" and ctx.get("lesson_type") in ("direct_instruction", "guided_practice", "discussion", "writing_workshop", "project"):
-        steps = [
-            (attendance, 5),
-            (f"Warm-up: students write two sentences connecting yesterday's work ({ctx.get('prior_state', 'previous lesson')}) to today's objective.", 5),
-            (f"Instruction: using {mats_phrase}, teach the lesson content. Key points: {objective}", 15),
-            (f"Guided practice: students work through the practice task in pairs while you circulate; stop the class after half the time to check one example together.", max(10, minutes - 40)),
-            (f"Exit ticket / deliverable: each student submits {deliverable}.", 5),
-            ("Collect the deliverable and note how far the class got for tomorrow's plan.", 5),
+        core = f" Focus on: {'; '.join(compressed)}." if compressed else ""
+        fixed = [
+            (attendance, admin),
+            (f"Warm-up: students write two sentences connecting the previous lesson ({ctx.get('prior_state', 'previous lesson')}) to today's objective.", admin),
+            (f"Instruction: using {mats_phrase}, present the lesson content. Key points: {objective}{core}", max(1, minutes // 3)),
+            ("Guided practice: students work through the practice task in pairs while you circulate; stop the class halfway to check one example together.", 0),
+            (f"Exit ticket / deliverable: each student submits {deliverable}.", admin),
+            ("Collect the deliverable and note how far the class got for the next plan.", admin),
         ]
+        steps = _fit(fixed, 3, minutes)
     else:
-        steps = [
-            (attendance, 5),
-            (f"Distribute {mats_phrase}. Read the directions aloud and show the first item as an example from the packet (do not teach new content).", 5),
-            (f"Students complete the task independently: {objective}", max(15, minutes - 25)),
-            ("Partner check: students compare answers with an elbow partner and star anything they disagree on for the teacher to review.", 10),
-            (f"Collect {deliverable}; students who are not finished write 'unfinished' at the top. Place work in the teacher's tray.", 5),
+        core = f" Today covers only: {'; '.join(compressed)}." if compressed else ""
+        fixed = [
+            (attendance, admin),
+            (f"Distribute {mats_phrase}. Read the directions aloud and model only the first item with the class; answer questions about directions only.{core}", admin),
+            (f"Students complete the task independently: {objective}", 0),
+            ("Partner check: students compare answers with an elbow partner and star anything they disagree on for the teacher to review.", max(1, min(10, minutes // 5))),
+            (f"Collect {deliverable}; students who are not finished write 'unfinished' at the top. Place work in the teacher's tray.", admin),
         ]
-    instructions = _steps_sum_to(steps, minutes)
+        steps = _fit(fixed, 2, minutes)
+    instructions = _number(steps)
     notes_next = ctx.get("next_day_note") or "Leave a note on how far the class got and any students who need follow-up."
     return SubPlanContent(
         date=ctx["date"], period=str(ctx.get("period", "")), course=ctx.get("course", ""), objective=objective,
         materials=materials or ["paper", "pencils"], instructions=instructions, student_deliverable=deliverable,
-        what_to_collect=[deliverable] + ([o for o in outputs[1:2]]), early_finisher_activity=early, classroom_rules=rule_texts,
+        what_to_collect=[deliverable] + list(outputs[1:2]), early_finisher_activity=early, classroom_rules=rule_texts,
         notes_for_next_day=notes_next, total_minutes=minutes, substitute_type=sub, standards=list(ctx.get("standards", [])),
     )

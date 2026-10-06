@@ -1,9 +1,15 @@
 {% extends "base.html" %}{% block content %}
 <div class="card"><h1 style="margin-top:0">Documents</h1>
+{% if message %}<p><span class="badge ok">done</span> {{ message }}</p>{% endif %}
 <form method="get" action="/documents"><input name="q" value="{{ q }}" placeholder="Search pacing guides, standards, calendar…" style="width:60%"> <button type="submit">Search</button></form>
 {% if hits %}<ul>{% for h in hits %}<li><strong>{{ h.title }}</strong> <span class="muted">({{ h.doc_type }}, {{ h.scope }})</span><br><span class="muted">{{ h.snippet }}</span></li>{% endfor %}</ul>{% endif %}
-<h3>Upload a teacher document</h3>
-<form method="post" action="/documents/upload" enctype="multipart/form-data"><input type="file" name="file" required> <select name="doc_type"><option value="syllabus">syllabus</option><option value="teacher_pacing_guide">pacing guide</option><option value="lesson_calendar">lesson calendar</option><option value="classroom_procedures">classroom procedures</option><option value="other">other</option></select> <select name="subject"><option value="">any subject</option><option value="english">english</option><option value="civics">civics</option></select> <button type="submit">Upload and index</button></form></div>
-<div class="card"><table><tr><th>Kind</th><th>Type</th><th>Title</th><th>Scope</th><th>Versions</th><th>Source</th></tr>
-{% for d in documents %}<tr><td>{{ d.kind.value }}</td><td>{{ d.doc_type.value }}</td><td>{{ d.title }}</td><td class="muted">{{ d.scope }}</td><td>{{ d.versions|length }}</td><td class="muted">{{ d.source_url or '' }}</td></tr>{% endfor %}</table></div>
+<h3>Add a document</h3>
+<p class="muted small">Rules are read at once. A new syllabus or pacing guide becomes a calendar proposal you approve.</p>
+<form method="post" action="/documents/upload" enctype="multipart/form-data"><input type="file" name="file" required>
+<select name="doc_type"><option value="syllabus">syllabus</option><option value="teacher_pacing_guide">pacing guide</option><option value="lesson_calendar">lesson calendar</option><option value="classroom_procedures">classroom procedures</option><option value="other">other</option></select>
+<select name="subject"><option value="">subject: work it out</option><option value="english">english</option><option value="civics">civics</option></select>
+<label class="small"><input type="checkbox" name="new_document" value="1"> keep as a separate document even if one with this name exists</label>
+<button type="submit">Upload and read</button></form></div>
+<div class="card"><table><tr><th>Kind</th><th>Type</th><th>Title</th><th>Subject</th><th>Versions</th></tr>
+{% for d in documents %}<tr><td>{{ d.kind.value }}</td><td>{{ d.doc_type.value }}</td><td>{{ d.title }}</td><td class="muted">{{ d.subject or '' }}</td><td>{{ d.versions|length }}</td></tr>{% endfor %}</table></div>
 {% endblock %}

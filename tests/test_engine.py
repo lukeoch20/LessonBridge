@@ -137,7 +137,8 @@ def test_reorder_pulls_forward_sub_deliverable_lesson():
     a = Item("a", "Teacher lesson", sequence=0, unit="u")
     b = Item("b", "Independent reading", sequence=1, unit="u", delivery={"any_sub", "regular_teacher"}, lesson_type="reading")
     decs = decide_days([MON], {MON: a}, [a, b], substitute_type="any_sub", absence_days=1, replacements=reps())
-    assert decs[0].decision == "REORDER" and decs[0].reorder_with is b
+    assert decs[0].decision == "REORDER" and decs[0].reorder_with.key == "b"
+    assert decs[0].reorder_with is not b  # decisions never share item objects (LB-07)
 
 
 def test_long_term_sub_keeps_new_material_and_flex():

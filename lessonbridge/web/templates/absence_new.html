@@ -1,9 +1,15 @@
 {% extends "base.html" %}{% block content %}
 <div class="card"><h1 style="margin-top:0">Report an absence</h1>
-<p class="muted">LessonBridge decides per lesson whether to keep, modify, replace, postpone or reorder, repairs the calendar, and shows you a diff before anything changes.</p>
+<p class="muted">LessonBridge decides per lesson whether to keep, modify, replace, postpone or reorder, repairs the calendar, and shows you every change before anything happens.</p>
+{% if ask_long_term %}
+<div class="card"><p><strong>This absence is longer than ten school days.</strong> Will a long-term substitute teach new material, or a day-to-day substitute supervise independent work?</p>
+<form method="post" action="/absences"><input type="hidden" name="start" value="{{ ask_long_term.start }}"><input type="hidden" name="end" value="{{ ask_long_term.end }}"><input type="hidden" name="reason" value="{{ ask_long_term.reason }}">
+<button type="submit" name="substitute" value="long_term_sub">Long-term substitute</button> <button class="secondary" type="submit" name="substitute" value="any_sub">Day-to-day substitutes</button></form></div>
+{% else %}
 <form method="post" action="/absences">
 <p><label>First day <input type="date" name="start" required></label> <label>Last day <input type="date" name="end"></label></p>
-<p><label>Substitute <select name="substitute"><option value="">auto (long-term for extended leave)</option><option value="any_sub">day-to-day substitute</option><option value="long_term_sub">long-term substitute</option></select></label></p>
+<p><label>Substitute <select name="substitute"><option value="">work it out (asks for long absences)</option><option value="any_sub">day-to-day substitute</option><option value="long_term_sub">long-term substitute</option></select></label></p>
 <p><label>Reason <input name="reason" placeholder="optional"></label></p>
-<p><button type="submit">Plan this absence</button></p></form></div>
+<p><button type="submit">Plan this absence</button></p></form>
+{% endif %}</div>
 {% endblock %}

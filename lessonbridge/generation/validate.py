@@ -6,20 +6,24 @@ from typing import Any
 
 from ..schemas import SubPlanContent, ValidationResult
 
-CLASSROOM_STAPLES = {"paper", "pencils", "pencil", "pens", "whiteboard", "board", "seating chart", "attendance sheet", "timer", "clock", "notebook", "notebooks", "independent reading book", "independent reading books", "chromebooks", "chromebook", "textbook"}
-NEW_CONTENT_PHRASES = ("teach ", "lecture", "introduce new", "direct instruction on", "explain the concept", "model how to")
+# Items any classroom has; listing them is never "inventing" a material.
+CLASSROOM_STAPLES = {"paper", "pencils", "pencil", "pens", "pen", "whiteboard", "board", "seating chart", "attendance sheet", "timer", "clock",
+                     "notebook", "notebooks", "independent reading book", "independent reading books", "chromebooks", "chromebook", "textbook", "notes", "class list"}
+# Resources that must be on the available list if a step uses them (LB-40).
+RESOURCE_WORDS = ("video", "youtube", "kahoot", "quizlet", "blooket", "gimkit", "website", "web site", "link", "film", "movie", "podcast", "game",
+                  "poster", "newspaper", "magazine", "slideshow", "powerpoint", "worksheet", "handout", "song", "app", "online", "google form", "padlet", "nearpod")
+NEW_CONTENT_PHRASES = ("teach ", "teach the", "lecture", "introduce new", "direct instruction on", "explain the concept", "present the lesson", "present new")
+PAREN_MINUTES_RE = re.compile(r"\((\d+)\s*min(?:ute)?s?\)")
 MINUTES_RE = re.compile(r"\((\d+)\s*min(?:ute)?s?\)|\b(\d+)\s*min(?:ute)?s?\b", re.I)
+_GENERIC = {"completed", "complete", "work", "class", "sheet", "student", "students", "final", "practice", "notes", "page", "pages"}
 
 
 def _norm(s: str) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", s.lower()).strip()
+    return re.sub(r"[^a-z0-9]+", " ", s.lower().replace("_", " ")).strip()
 
 
 def _words(s: str) -> set[str]:
     return {w for w in _norm(s).split() if len(w) > 3}
-
-
-PAREN_MINUTES_RE = re.compile(r"\((\d+)\s*min(?:ute)?s?\)")
 
 
 def step_minutes(step: str) -> int:
@@ -34,20 +38,34 @@ def step_minutes(step: str) -> int:
     return int(g1 or g2)
 
 
+def _material_ok(item: str, available: set[str]) -> bool:
+    n = _norm(item)
+    if not n:
+        return True
+    if n in available or n in CLASSROOM_STAPLES or n.rstrip("s") in CLASSROOM_STAPLES:
+        return True
+    # A listed material may be named with an extra qualifier ("federalism slides (printed)").
+    return any(a and (n == a or n.startswith(a + " ") or a.startswith(n + " ")) and len(min(n, a, key=len)) > 6 for a in available)
+
+
 def validate_plan(plan: SubPlanContent, ctx: dict[str, Any]) -> ValidationResult:
     """``ctx`` is the same context dict the generator received."""
     failures: list[str] = []
     warnings: list[str] = []
+    available = {_norm(m) for m in ctx.get("available_materials", [])}
 
-    # 1. Uses only available materials.
-    available = {_norm(m) for m in ctx.get("available_materials", [])} | {_norm(s) for s in CLASSROOM_STAPLES}
+    # 1. Uses only available materials: whole-item comparison, not substring (LB-40).
     for m in plan.materials:
-        nm = _norm(m)
-        if not nm:
-            continue
-        if nm in available or any(nm in a or a in nm for a in available if a):
-            continue
-        failures.append(f"Material not available: '{m}'")
+        if not _material_ok(m, available):
+            failures.append(f"Material not available: '{m}'")
+    # 1b. Resources mentioned only in the steps must be available too.
+    listed_text = " ".join(available)
+    for step in plan.instructions:
+        low = _norm(step)
+        for word in RESOURCE_WORDS:
+            if re.search(rf"\b{re.escape(word)}s?\b", low) and word not in listed_text:
+                failures.append(f"Step uses a resource that is not available ({word}): '{step[:60]}'")
+                break
 
     # 2. Fits class duration and steps are timed and sum correctly.
     minutes = int(ctx["class_minutes"])
@@ -56,7 +74,7 @@ def validate_plan(plan: SubPlanContent, ctx: dict[str, Any]) -> ValidationResult
     timed = [step_minutes(s) for s in plan.instructions]
     if not plan.instructions:
         failures.append("No instruction steps")
-    elif any(t == 0 for t in timed):
+    elif any(t <= 0 for t in timed):
         failures.append("Every instruction step must state its minutes, e.g. '(10 min)'")
     elif sum(timed) != minutes:
         failures.append(f"Instruction steps sum to {sum(timed)} minutes, not {minutes}")
@@ -73,19 +91,20 @@ def validate_plan(plan: SubPlanContent, ctx: dict[str, Any]) -> ValidationResult
         if bad:
             failures.append("A day-to-day substitute should not teach new content: " + bad[0][:80])
 
-    # 5. Does not invent assignments: deliverable must match an expected output.
-    expected = [_norm(o) for o in ctx.get("expected_outputs", [])]
+    # 5. Does not invent assignments: the deliverable must be an expected output as a whole phrase (LB-40).
+    expected = [_norm(o) for o in ctx.get("expected_outputs", []) if _norm(o)]
     if expected:
         d = _norm(plan.student_deliverable)
-        if not any(e in d or d in e or len(_words(e) & _words(d)) >= 1 for e in expected if e):
+        distinctive = lambda e: _words(e) - _GENERIC
+        ok = any(e == d or e in d or (d in e and len(d) > 6) or (distinctive(e) and distinctive(e) <= _words(d)) for e in expected)
+        if not ok:
             failures.append(f"Student deliverable '{plan.student_deliverable}' is not one of the expected outputs {ctx.get('expected_outputs')}")
 
     # 6. Includes applicable classroom rules verbatim.
-    rule_texts = [r["text"] for r in ctx.get("rules", [])]
     present = {_norm(r) for r in plan.classroom_rules}
-    for r in rule_texts:
-        if _norm(r) not in present:
-            failures.append(f"Missing classroom rule: '{r[:70]}'")
+    for r in ctx.get("rules", []):
+        if _norm(r["text"]) not in present:
+            failures.append(f"Missing classroom rule: '{r['text'][:70]}'")
 
     # 7. Timed routines from structured rules (e.g. pre-quiz study period).
     for r in ctx.get("rules", []):
@@ -100,7 +119,6 @@ def validate_plan(plan: SubPlanContent, ctx: dict[str, Any]) -> ValidationResult
     if not ctx.get("is_meeting_day", True):
         failures.append("Section does not meet on this date")
 
-    # Warnings (do not fail).
     if len(plan.instructions) > 10:
         warnings.append("More than ten steps; consider consolidating")
     if not plan.what_to_collect:

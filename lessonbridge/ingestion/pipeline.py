@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -79,6 +79,7 @@ def ingest_bytes(
     subject: Optional[str] = None,
     structured: Optional[dict] = None,
     text_override: Optional[str] = None,
+    as_new_version: bool = True,
     cfg: Settings | None = None,
 ) -> IngestResult:
     """Validate, extract, store, index and version one document payload."""
@@ -89,7 +90,17 @@ def ingest_bytes(
     content_type = content_type or guess_content_type(name)
     digest = checksum(data)
 
-    doc = session.scalar(select(Document).where(Document.scope == scope, Document.doc_type == doc_type, Document.title == title))
+    # Identity includes the subject, so an English and a Civics "syllabus" stay separate documents (LB-45).
+    q = select(Document).where(Document.scope == scope, Document.doc_type == doc_type, Document.title == title)
+    q = q.where(Document.subject.is_(None)) if subject is None else q.where(Document.subject == subject)
+    doc = session.scalar(q)
+    if doc is not None and not as_new_version:
+        current_cs = session.scalar(select(DocumentVersion.checksum).where(DocumentVersion.document_id == doc.id, DocumentVersion.is_current.is_(True)))
+        if current_cs != digest:
+            n = 2
+            while session.scalar(select(Document).where(Document.scope == scope, Document.doc_type == doc_type, Document.title == f"{title} ({n})")):
+                n += 1
+            title, doc = f"{title} ({n})", None
     if doc is None:
         doc = Document(kind=kind, doc_type=doc_type, title=title, scope=scope, source_url=source_url, provider=provider, subject=subject)
         session.add(doc)

@@ -8,10 +8,10 @@ subjects: [english, civics]
 school_year: "2026-2027"
 planning_periods: ["4"]
 sections:
-  - {subject: english, section_name: "English 7 - Period 1", period: "1", minutes_per_meeting: 50, room: "214"}
-  - {subject: english, section_name: "English 7 - Period 2", period: "2", minutes_per_meeting: 50, room: "214"}
-  - {subject: civics,  section_name: "Civics & Economics - Period 3", period: "3", minutes_per_meeting: 50, room: "214"}
-  - {subject: civics,  section_name: "Civics & Economics - Period 5", period: "5", minutes_per_meeting: 50, room: "214"}
+  - {subject: english, section_name: "English 7 - Period 1", period: "1", minutes_per_meeting: 50, early_release_minutes: 30, room: "214"}
+  - {subject: english, section_name: "English 7 - Period 2", period: "2", minutes_per_meeting: 50, early_release_minutes: 30, room: "214"}
+  - {subject: civics,  section_name: "Civics & Economics - Period 3", period: "3", minutes_per_meeting: 50, early_release_minutes: 30, room: "214"}
+  - {subject: civics,  section_name: "Civics & Economics - Period 5", period: "5", minutes_per_meeting: 50, early_release_minutes: 30, room: "214"}
 documents:
   - {path: teacher_docs/english7_syllabus.md, doc_type: syllabus, subject: english}
   - {path: teacher_docs/civics_syllabus.md, doc_type: syllabus, subject: civics}

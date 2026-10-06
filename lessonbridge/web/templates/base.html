@@ -16,6 +16,7 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{border-bottom:1px
 button,.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:7px 12px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}button.secondary,.btn.secondary{background:#eef2f6;color:var(--ink)}button.danger{background:#c92a2a}
 form.inline{display:inline}input,select,textarea{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px}textarea{width:100%;min-height:260px;font-family:ui-monospace,monospace;font-size:13px}
 .muted{color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.err{color:#c92a2a}.small{font-size:12px}details{margin-top:4px}
 .doc h1{font-size:22px}.doc h2{font-size:17px;margin-top:22px}.doc table{margin:8px 0}
 </style>
 </head>
@@ -28,6 +29,7 @@ form.inline{display:inline}input,select,textarea{font:inherit;padding:6px 8px;bo
   <a href="/events">School calendar</a>
   <a href="/documents">Documents</a>
   <a href="/onboard">Onboard</a>
+  <a href="/teachers">Teachers</a>
 </header>
 <main>{% block content %}{% endblock %}</main>
 </body>

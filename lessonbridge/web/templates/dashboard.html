@@ -2,28 +2,35 @@
 <div class="card">
   <h1 style="margin:0 0 4px">{{ teacher.name }}</h1>
   <div class="muted">{{ teacher.school.name }} · {{ teacher.school.district_name }} · Grade {{ teacher.grade }} · {{ teacher.school_year }}</div>
-  <p class="muted">Teacher touches so far: <strong>{{ touches }}</strong> · Generator: {% if llm_on %}Claude ({{ model }}){% else %}template (no Claude credentials found){% endif %}
+  <p class="muted">Teacher touches so far: <strong>{{ touches }}</strong> · Generator: {% if llm_on %}Claude ({{ model }}){% else %}template ({{ llm_reason }}){% endif %}
   {% if flagged %} · <span class="badge warn">{{ flagged }} school-calendar dates still provisional</span> <a href="/events">confirm</a>{% endif %}</p>
 </div>
 {% if pending %}
-<div class="card"><h2 style="margin-top:0">Proposals waiting for your approval</h2>
-<table><tr><th>#</th><th>Kind</th><th>Section</th><th>Created</th><th></th></tr>
-{% for p in pending %}<tr><td>{{ p.id }}</td><td>{{ p.kind }}</td><td>{{ p.teacher_course_id }}</td><td>{{ p.created_at.strftime('%b %d %H:%M') }}</td><td><a class="btn secondary" href="/proposals/{{ p.id }}">Review diff</a></td></tr>{% endfor %}
+<div class="card"><h2 style="margin-top:0">Proposals waiting for you</h2>
+<table><tr><th>#</th><th>Kind</th><th>Section</th><th>Status</th><th></th></tr>
+{% for p in pending %}<tr><td>{{ p.id }}</td><td>{{ p.kind }}</td><td>{{ sections[p.teacher_course_id].section_name if p.teacher_course_id in sections else '' }}</td>
+<td>{% if p.status.value == 'blocked' %}<span class="badge warn">blocked</span>{% elif p.constraints.get('decisions_required') %}<span class="badge warn">needs your decision</span>{% else %}pending{% endif %}</td>
+<td><a class="btn secondary" href="/proposals/{{ p.id }}">Review changes</a></td></tr>{% endfor %}
 </table></div>
 {% endif %}
+{% if owed %}<div class="card"><h2 style="margin-top:0">Owed lessons (not on the calendar yet)</h2>
+<ul>{% for sec, o in owed %}<li>{{ sec.section_name }}: {{ o.title }} <span class="muted">({{ o.kind }}: {{ o.reason }})</span></li>{% endfor %}</ul>
+<p class="muted">Open the section's calendar to schedule them.</p></div>{% endif %}
+{% if stale %}<div class="card"><h2 style="margin-top:0">Substitute plans that need regenerating</h2>
+<ul>{% for p in stale %}<li><a href="/subplans/{{ p.id }}">{{ p.date }} · {{ p.section.section_name }}</a> — the day changed after the plan was made (<a href="/absences/{{ p.absence_id }}">absence {{ p.absence_id }}</a>)</li>{% endfor %}</ul></div>{% endif %}
 <div class="grid">
 {% for sec in teacher.sections %}
 <div class="card">
   <h3 style="margin:0">{{ sec.section_name }}</h3>
-  <div class="muted">Period {{ sec.period }} · {{ sec.minutes_per_meeting }} min · {{ sec.units|length }} units · {{ sec.calendar|length }} course-days</div>
+  <div class="muted">Period {{ sec.period }} · {{ sec.minutes_per_meeting }} min · {{ sec.active_units|length }} units · {{ sec.calendar|length }} course-days</div>
   <table style="margin-top:8px">{% for e in upcoming[sec.id] %}<tr><td>{{ e.date.strftime('%a %b %d') }}</td><td>{{ e.title }} {% if e.is_sub_day %}<span class="badge sub">SUB</span>{% endif %}</td><td class="muted">{{ e.status.value }}</td></tr>{% endfor %}</table>
   <p><a class="btn secondary" href="/calendar/{{ sec.id }}">Open calendar</a></p>
 </div>
 {% endfor %}
 </div>
 <div class="card"><h2 style="margin-top:0">Absences</h2>
-{% if teacher.absences %}<table><tr><th>#</th><th>Dates</th><th>Type</th><th>Substitute</th><th>Status</th><th>Proposals</th><th>Plans</th><th></th></tr>
-{% for a in teacher.absences %}<tr><td>{{ a.id }}</td><td>{{ a.start_date }} → {{ a.end_date }}</td><td>{{ a.absence_type.value }}</td><td>{{ a.substitute_type.value }}</td><td>{{ a.status.value }}</td><td>{{ a.proposals|length }}</td><td>{{ a.sub_plans|length }}</td><td><a class="btn secondary" href="/absences/{{ a.id }}">Open</a></td></tr>{% endfor %}</table>
+{% if teacher.absences %}<table><tr><th>#</th><th>Dates</th><th>Type</th><th>Substitute</th><th>Status</th><th>Plans</th><th></th></tr>
+{% for a in teacher.absences %}<tr><td>{{ a.id }}</td><td>{{ a.start_date }} → {{ a.end_date }}</td><td>{{ a.absence_type.value }}</td><td>{{ a.substitute_type.value }}</td><td>{{ a.status.value }}</td><td>{{ a.sub_plans|length }}</td><td><a class="btn secondary" href="/absences/{{ a.id }}">Open</a></td></tr>{% endfor %}</table>
 {% else %}<p class="muted">No absences reported yet.</p>{% endif %}
 <p><a class="btn" href="/absences/new">Report an absence</a></p></div>
 {% endblock %}

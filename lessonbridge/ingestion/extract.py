@@ -55,14 +55,41 @@ def _pdf(data: bytes) -> str:
 
 
 def _docx(data: bytes) -> str:
+    """Paragraphs and tables in document order (LB-12); one line per table row, cells joined by ' | '.
+
+    Heading paragraphs are prefixed with '#' so the curriculum parser can tell
+    them from body text.
+    """
     import docx
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
 
     document = docx.Document(io.BytesIO(data))
-    parts = [p.text for p in document.paragraphs]
-    for table in document.tables:
-        for row in table.rows:
-            parts.append(" | ".join(cell.text.strip() for cell in row.cells))
-    return "\n".join(p for p in parts if p is not None)
+    out: list[str] = []
+    for child in document.element.body.iterchildren():
+        tag = child.tag.rsplit("}", 1)[-1]
+        if tag == "p":
+            para = Paragraph(child, document)
+            text = para.text.strip()
+            if not text:
+                continue
+            style = (para.style.name if para.style is not None else "") or ""
+            if style.lower().startswith(("heading", "title")):
+                level = "".join(ch for ch in style if ch.isdigit()) or "1"
+                text = "#" * min(int(level), 6) + " " + text
+            out.append(text)
+        elif tag == "tbl":
+            table = Table(child, document)
+            for row in table.rows:
+                cells, seen = [], set()
+                for cell in row.cells:
+                    if id(cell._tc) in seen:  # merged cells repeat the same element
+                        continue
+                    seen.add(id(cell._tc))
+                    cells.append(" ".join(cell.text.split()))
+                if any(cells):
+                    out.append(" | ".join(cells))
+    return "\n".join(out)
 
 
 def _xlsx(data: bytes) -> str:

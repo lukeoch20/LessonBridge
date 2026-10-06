@@ -83,9 +83,15 @@ class UnitSpec(BaseModel):
     summary: str = ""
     standards: list[str] = Field(default_factory=list)
     quarter: Optional[int] = None
-    planned_days: int = 10
+    # None means "not stated" (LB-27); a stated length always wins over the default.
+    planned_days: Optional[int] = None
     lessons: list[LessonSpec] = Field(default_factory=list)
     source: str = "generated"
+    # Set when the unit came from week-by-week lines; such units never receive an invented assessment.
+    from_weeks: bool = False
+    # Match confidence against the default unit it was paired with (None when unmatched / default).
+    match_confidence: Optional[float] = None
+    matched_default: Optional[str] = None
 
 
 class CurriculumSpec(BaseModel):
@@ -113,40 +119,22 @@ class ExtractedTeacherContext(BaseModel):
     assessments: list[str] = Field(default_factory=list)
     conflicts: list[str] = Field(default_factory=list)
     confidence: float = 0.5
+    notes: list[str] = Field(default_factory=list)
+    subject: Optional[str] = None
 
 
 # ---------------------------------------------------------------------- planning
-class CalendarDay(BaseModel):
-    date: date
-    section_id: int
-    title: str
-    kind: str = "lesson"
-    lesson_slug: Optional[str] = None
-    unit_slug: Optional[str] = None
-    status: str = "planned"
-    detail_level: str = "lesson"
-    is_sub_day: bool = False
-    notes: str = ""
-    merged_lesson_slugs: list[str] = Field(default_factory=list)
-
-
-class DecisionResult(BaseModel):
-    date: date
-    section_id: int
-    lesson_slug: Optional[str]
-    lesson_title: str
-    decision: Literal["KEEP", "MODIFY", "REPLACE", "POSTPONE", "REORDER"]
-    rationale: str
-    replacement_slug: Optional[str] = None
-    inputs: dict[str, Any] = Field(default_factory=dict)
-
-
 class DiffItem(BaseModel):
-    """One line of a proposed change to the instructional calendar."""
+    """One calendar day in a proposal: the exact state approval expects and the state it will write."""
 
     section_id: int
     date: date
-    action: Literal["shift", "merge", "compress", "replace", "defer", "drop", "preserve", "insert", "keep"]
+    action: str  # keep | shift | merge | compress | substitute | replace | carry | release | update | insert
+    before: Optional[dict[str, Any]] = None
+    after: Optional[dict[str, Any]] = None
+    changed: bool = True
+    reason: str = ""
+    # Convenience copies for display.
     before_title: Optional[str] = None
     after_title: Optional[str] = None
     before_lesson_slug: Optional[str] = None
@@ -154,17 +142,16 @@ class DiffItem(BaseModel):
     after_kind: str = "lesson"
     merged_lesson_slugs: list[str] = Field(default_factory=list)
     is_sub_day: bool = False
+    new_date: Optional[date] = None
+
+
+class BacklogChange(BaseModel):
+    lesson_id: int
+    key: str
+    title: str
+    kind: Literal["owed", "dropped"] = "owed"
     reason: str = ""
-    new_date: Optional[date] = None  # for shift/defer: where the displaced lesson landed
-
-
-class ProposalSpec(BaseModel):
-    section_id: int
-    explanation: str
-    diff: list[DiffItem]
-    hard_constraints: list[str] = Field(default_factory=list)
-    soft_constraint_notes: list[str] = Field(default_factory=list)
-    unresolved: list[str] = Field(default_factory=list)
+    is_assessment: bool = False
 
 
 # -------------------------------------------------------------- generated artefacts

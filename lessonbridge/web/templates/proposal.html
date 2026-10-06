@@ -1,10 +1,16 @@
 {% extends "base.html" %}{% block content %}
-<div class="card doc">{{ body|safe }}
-<p>Status: <strong>{{ proposal.status.value }}</strong></p>
+<div class="card doc">{{ body }}
+<p>Status: <strong>{{ proposal.status.value }}</strong>{% if proposal.status.value in ('stale', 'superseded') %} — the calendar changed after this was planned; plan it again{% if proposal.absence_id %} from <a href="/absences/{{ proposal.absence_id }}">the absence page</a>{% endif %}.{% endif %}</p>
 {% if proposal.status.value == 'pending' %}
-<form class="inline" method="post" action="/proposals/{{ proposal.id }}/approve"><button type="submit">Approve — make this the calendar</button></form>
+<form class="inline" method="post" action="/proposals/{{ proposal.id }}/approve">
+{% if proposal.constraints.get('decisions_required') %}<p><label><input type="checkbox" name="acknowledge" value="1" required> I accept the decisions listed above.</label></p>{% endif %}
+<button type="submit">Approve — make this the calendar</button></form>
 <form class="inline" method="post" action="/proposals/{{ proposal.id }}/reject"><button class="danger" type="submit">Reject</button></form>
+{% if fillers %}<h3>Change a substitute activity</h3>
+{% for r in fillers %}<form method="post" action="/proposals/{{ proposal.id }}/activity"><input type="hidden" name="on" value="{{ r.date }}">{{ r.date.strftime('%a %b %d') }}: <select name="activity">{% for a in activities %}<option value="{{ a.slug }}" {% if r.after and r.after.get('replacement_activity_id') == a.id %}selected{% endif %}>{{ a.title }}</option>{% endfor %}</select> <button class="secondary" type="submit">use this</button></form>{% endfor %}{% endif %}
+{% elif proposal.status.value == 'approved' %}
+<form class="inline" method="post" action="/proposals/{{ proposal.id }}/undo"><button class="secondary" type="submit">Undo (propose reverting it)</button></form>
 {% endif %}
-<p><a class="btn secondary" href="/calendar/{{ section.id }}?start={{ proposal.diff[0].date if proposal.diff else '' }}">Open calendar</a> {% if proposal.absence_id %}<a class="btn secondary" href="/absences/{{ proposal.absence_id }}">Back to absence</a>{% endif %}</p>
+<p><a class="btn secondary" href="/calendar/{{ section.id }}{% if proposal.window_start %}?start={{ proposal.window_start }}{% endif %}">Open calendar</a> {% if proposal.absence_id %}<a class="btn secondary" href="/absences/{{ proposal.absence_id }}">Back to absence</a>{% endif %}</p>
 </div>
 {% endblock %}

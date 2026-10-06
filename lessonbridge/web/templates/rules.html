@@ -1,7 +1,9 @@
 {% extends "base.html" %}{% block content %}
 <div class="card"><h1 style="margin-top:0">Classroom rules</h1>
-<p class="muted">Rules are mandatory and are inserted into every applicable plan and checked by the quality gate. Type them in plain language; LessonBridge infers the trigger (for example quiz days) and any timing.</p>
-<form method="post" action="/rules"><input name="text" style="width:70%" placeholder="e.g. On quiz days, students receive 15 minutes to study before the quiz." required> <button type="submit">Add rule</button></form></div>
-<div class="card"><table><tr><th>Scope</th><th>Category</th><th>Rule</th><th>Structured</th><th>Source</th><th>Active</th></tr>
-{% for r in rules %}<tr><td>{{ r.scope.value }}</td><td>{{ r.category }}</td><td>{{ r.text }}</td><td class="muted">{{ r.structured }}</td><td class="muted">{{ r.source }}</td><td>{{ 'yes' if r.active else 'superseded' }}</td></tr>{% endfor %}</table></div>
+<p class="muted">Rules are inserted into every plan they apply to and checked by the quality gate. Type them in plain language and check how LessonBridge understood each one.</p>
+<form method="post" action="/rules"><input name="text" style="width:60%" placeholder="e.g. Before each quiz, give students fifteen minutes to study." required>
+<select name="scope"><option value="teacher">all my classes</option><option value="course">one subject</option><option value="unit">one unit</option><option value="lesson">one lesson</option></select>
+<input name="target" placeholder="subject / unit slug / lesson slug"> <button type="submit">Add rule</button></form></div>
+<div class="card"><table><tr><th>Scope</th><th>Rule</th><th>Understood as</th><th>Source</th><th>Active</th></tr>
+{% for r, meaning in rules %}<tr><td>{{ r.scope.value }}</td><td>{{ r.text }}</td><td class="muted">{{ meaning }}</td><td class="muted">{{ r.source }}</td><td>{{ 'yes' if r.active else 'superseded' }}</td></tr>{% endfor %}</table></div>
 {% endblock %}
