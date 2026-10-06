@@ -62,15 +62,15 @@ def test_school_days_and_quarter_allocation(cfg):
         assert ys.quarter_for(date(2026, 10, 26)) == 1 and ys.quarter_for(date(2026, 11, 5)) == 2
         assert ys.quarter_end_on_or_after(date(2026, 10, 26)) == date(2026, 10, 30)
 
-    class U:  # lightweight stand-in for CurriculumUnit
-        def __init__(self, id, q, planned, n):
-            self.id, self.quarter, self.planned_days, self.lessons = id, q, planned, [None] * n
+    from lessonbridge.curriculum.calendar import UnitPlan
 
-    units = [U(1, 1, 10, 6), U(2, 1, 20, 10), U(3, 2, 20, 10)]
+    units = [UnitPlan(1, "a", "A", 1, 10, [None] * 6), UnitPlan(2, "b", "B", 1, 20, [None] * 10), UnitPlan(3, "c", "C", 2, 20, [None] * 10)]
     with db.session_scope() as s:
         ys = load_year_structure(s, "lcps", "2026-2027")
         days = school_days(ys, ys.first_day, ys.last_day)
-    slots = allocate_unit_slots(units, days)
+    slots = allocate_unit_slots(units, days)  # keyed by position in the sequence
     q1 = sum(1 for d in days if d.quarter == 1)
-    assert slots[1] + slots[2] == q1  # quarter 1 fully used, slack spread proportionally
-    assert slots[1] >= 10 and slots[2] >= 20 and slots[2] > slots[1]
+    q2 = sum(1 for d in days if d.quarter == 2)
+    assert slots[0] + slots[1] == q1  # quarter 1 fully used, slack spread proportionally
+    assert slots[0] >= 10 and slots[1] >= 20 and slots[1] > slots[0]
+    assert slots[2] == q2

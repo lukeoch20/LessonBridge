@@ -14,13 +14,30 @@ ANY = ["regular_teacher", "long_term_sub", "any_sub"]
 IND = ["regular_teacher", "long_term_sub", "any_sub", "independent"]
 
 
-def _l(slug, title, objective, lesson_type="direct_instruction", delivery=RT, priority="required", prereqs=(), materials=(), output=(), standards=(), mins=50, mvm=30, can_move=True, optional_components=(), required_components=()):
+# Core (required) and optional parts per lesson type. Compression keeps the core and skips the optional
+# parts, so two lessons can share one class period when their cores fit (LB-23).
+COMPONENTS = {
+    "direct_instruction": (["mini-lesson on the key concept", "check for understanding"], ["extended modeling", "exit ticket"], 25),
+    "guided_practice": (["guided practice on the core task"], ["extension problems", "whole-class debrief"], 20),
+    "independent_practice": (["independent practice set"], ["extension work", "partner check"], 20),
+    "review": (["targeted review of key ideas"], ["review game", "extra practice items"], 15),
+    "discussion": (["structured discussion on the core question"], ["extended debate", "written reflection"], 25),
+    "writing_workshop": (["focused writing time"], ["conferencing", "sharing"], 25),
+    "reading": (["reading time"], ["response discussion"], 25),
+    "project": (["project work time"], ["presentations"], 30),
+    "enrichment": ([], ["enrichment activity"], 15),
+}
+
+
+def _l(slug, title, objective, lesson_type="direct_instruction", delivery=RT, priority="required", prereqs=(), materials=(), output=(), standards=(), mins=50, mvm=None, can_move=True, optional_components=None, required_components=None):
+    req, opt, core = COMPONENTS.get(lesson_type, ([], [], 30))
     return LessonSpec(
         slug=slug, title=title, objective=objective, lesson_type=lesson_type,
         delivery_requirement=list(delivery), priority=priority, prerequisites=list(prereqs),
         materials=list(materials), student_output=list(output), standards=list(standards),
-        duration_minutes=mins, minimum_viable_minutes=mvm, can_move=can_move,
-        optional_components=list(optional_components), required_components=list(required_components),
+        duration_minutes=mins, minimum_viable_minutes=mvm if mvm is not None else min(core, mins), can_move=can_move,
+        optional_components=list(optional_components if optional_components is not None else opt),
+        required_components=list(required_components if required_components is not None else req),
     )
 
 
@@ -277,8 +294,24 @@ def default_replacement_activities() -> list[dict]:
         ("guided-textbook-reading", "Guided textbook reading", "Students read the assigned textbook section and answer the guided reading questions.", 45, "curriculum_preserving", ["textbook", "guided_reading_questions"], "guided reading questions"),
         ("emergency-civics-packet", "Emergency civics packet", "Students complete the emergency civics packet. Collect at the end of class.", 45, "emergency_filler", ["emergency_civics_packet"], "completed packet"),
     ]
+    # Keywords that say which units an activity fits, so a substitute day stays close to the current unit (LB-50).
+    tags = {
+        "grammar-spiral-review": ["grammar", "editing", "writing", "narrative", "argumentative", "conventions", "dialogue"],
+        "independent-reading-response": ["reading", "fiction", "novel", "story", "stories", "character", "theme", "plot", "launching"],
+        "editing-practice": ["editing", "writing", "narrative", "argumentative", "research", "revision", "drafting", "conventions"],
+        "vocabulary-practice": ["vocabulary", "word", "context", "poetry", "figurative", "launching", "nonfiction"],
+        "writing-review": ["writing", "argumentative", "narrative", "essay", "claims", "evidence", "research", "thesis"],
+        "emergency-reading-packet": ["reading"],
+        "constitution-review": ["constitution", "founding", "documents", "amendments", "rights", "federalism", "government", "branches", "principles"],
+        "primary-source-analysis": ["primary", "sources", "documents", "declaration", "founding", "court", "judicial", "history", "skills"],
+        "civics-vocabulary-review": ["vocabulary", "citizenship", "political", "economics", "government", "local", "policy"],
+        "current-events-analysis": ["political", "policy", "media", "economics", "citizenship", "elections", "voting", "local", "public"],
+        "guided-textbook-reading": ["government", "economics", "judicial", "courts", "local", "state", "national", "virginia"],
+        "emergency-civics-packet": ["civics"],
+    }
     out = []
     for subject, rows in (("english", english), ("civics", civics)):
         for slug, title, desc, mins, cat, mats, output in rows:
-            out.append({"subject": subject, "slug": slug, "title": title, "description": desc, "duration_minutes": mins, "category": cat, "materials": mats, "student_output": output, "delivery": "any_sub"})
+            out.append({"subject": subject, "slug": slug, "title": title, "description": desc, "duration_minutes": mins, "category": cat, "materials": mats,
+                        "student_output": output, "delivery": "any_sub", "tags": [cat] + tags.get(slug, [])})
     return out

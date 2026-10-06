@@ -20,6 +20,7 @@ from typing import Any, Optional
 from sqlalchemy import (
     JSON,
     Boolean,
+    text,
     Date,
     DateTime,
     Enum,
@@ -121,8 +122,6 @@ class EntryStatus(str, enum.Enum):
     planned = "planned"
     completed = "completed"
     skipped = "skipped"
-    moved = "moved"
-    replaced = "replaced"
 
 
 class DetailLevel(str, enum.Enum):
@@ -170,14 +169,17 @@ class ProposalStatus(str, enum.Enum):
     pending = "pending"
     approved = "approved"
     rejected = "rejected"
-    superseded = "superseded"
+    superseded = "superseded"  # another approval changed the calendar this proposal was computed against
+    stale = "stale"  # approval found the live calendar no longer matches the proposal's before-state
+    blocked = "blocked"  # failed the invariant gate; cannot be approved
+    reverted = "reverted"  # approved, then undone by an approved undo proposal
 
 
 class SubPlanStatus(str, enum.Enum):
     draft = "draft"
     failed_validation = "failed_validation"
     accepted = "accepted"
-    edited = "edited"
+    stale = "stale"  # the calendar day changed after the plan was generated
 
 
 # --------------------------------------------------------------------------- core
@@ -211,6 +213,10 @@ class Teacher(Base):
     rules: Mapped[list["TeacherRule"]] = relationship(back_populates="teacher", cascade="all, delete-orphan")
     preferences: Mapped[list["TeacherPreference"]] = relationship(back_populates="teacher", cascade="all, delete-orphan")
     absences: Mapped[list["AbsenceEvent"]] = relationship(back_populates="teacher", cascade="all, delete-orphan")
+    touches: Mapped[list["TeacherTouch"]] = relationship(cascade="all, delete-orphan")
+    proposals: Mapped[list["Proposal"]] = relationship(cascade="all, delete-orphan", overlaps="absence,proposals")
+    calendar_changes: Mapped[list["CalendarChange"]] = relationship(cascade="all, delete-orphan")
+    document_links: Mapped[list["TeacherDocument"]] = relationship(cascade="all, delete-orphan")
 
 
 class Course(Base):
@@ -228,7 +234,7 @@ class TeacherCourse(Base):
 
     __tablename__ = "teacher_courses"
     id: Mapped[int] = mapped_column(primary_key=True)
-    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id"))
+    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id", ondelete="CASCADE"))
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"))
     section_name: Mapped[str] = mapped_column(String(100))
     period: Mapped[str] = mapped_column(String(16), default="1")
@@ -238,11 +244,23 @@ class TeacherCourse(Base):
     room: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     # Sections of the same course that share one plan (e.g. three English blocks).
     plan_group: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    # Length of this section's period on early-release days (LB-53); None = not yet confirmed.
+    early_release_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     teacher: Mapped[Teacher] = relationship(back_populates="sections")
     course: Mapped[Course] = relationship()
     units: Mapped[list["CurriculumUnit"]] = relationship(back_populates="section", cascade="all, delete-orphan", order_by="CurriculumUnit.sequence")
     calendar: Mapped[list["CalendarEntry"]] = relationship(back_populates="section", cascade="all, delete-orphan", order_by="CalendarEntry.date")
+    owed: Mapped[list["OwedLesson"]] = relationship(back_populates="section", cascade="all, delete-orphan")
+
+    @property
+    def active_units(self) -> list["CurriculumUnit"]:
+        return [u for u in self.units if u.active]
+
+    def minutes_on(self, is_early_release: bool) -> int:
+        if is_early_release:
+            return self.early_release_minutes or max(20, int(round(self.minutes_per_meeting * 0.6 / 5.0) * 5))
+        return self.minutes_per_meeting
 
 
 # ---------------------------------------------------------------------- documents
@@ -289,9 +307,9 @@ class DocumentVersion(Base):
 class TeacherDocument(Base):
     __tablename__ = "teacher_documents"
     id: Mapped[int] = mapped_column(primary_key=True)
-    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id"))
+    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id", ondelete="CASCADE"))
     document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"))
-    teacher_course_id: Mapped[Optional[int]] = mapped_column(ForeignKey("teacher_courses.id"), nullable=True)
+    teacher_course_id: Mapped[Optional[int]] = mapped_column(ForeignKey("teacher_courses.id", ondelete="CASCADE"), nullable=True)
     role: Mapped[str] = mapped_column(String(64), default="reference")
 
     document: Mapped[Document] = relationship()
@@ -339,7 +357,7 @@ class SchoolCalendarEvent(Base):
 class CurriculumUnit(Base):
     __tablename__ = "curriculum_units"
     id: Mapped[int] = mapped_column(primary_key=True)
-    teacher_course_id: Mapped[int] = mapped_column(ForeignKey("teacher_courses.id"))
+    teacher_course_id: Mapped[int] = mapped_column(ForeignKey("teacher_courses.id", ondelete="CASCADE"))
     sequence: Mapped[int] = mapped_column(Integer)
     slug: Mapped[str] = mapped_column(String(100))
     title: Mapped[str] = mapped_column(String(200))
@@ -348,6 +366,8 @@ class CurriculumUnit(Base):
     quarter: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     planned_days: Mapped[int] = mapped_column(Integer, default=10)
     source: Mapped[str] = mapped_column(String(32), default="generated")  # generated | syllabus | pacing_guide | teacher
+    # Superseded curriculum versions stay for history (completed days reference them) but are not planned.
+    active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("1"))
 
     section: Mapped[TeacherCourse] = relationship(back_populates="units")
     lessons: Mapped[list["Lesson"]] = relationship(back_populates="unit", cascade="all, delete-orphan", order_by="Lesson.sequence")
@@ -356,7 +376,7 @@ class CurriculumUnit(Base):
 class Lesson(Base):
     __tablename__ = "lessons"
     id: Mapped[int] = mapped_column(primary_key=True)
-    unit_id: Mapped[int] = mapped_column(ForeignKey("curriculum_units.id"))
+    unit_id: Mapped[int] = mapped_column(ForeignKey("curriculum_units.id", ondelete="CASCADE"))
     sequence: Mapped[int] = mapped_column(Integer)
     slug: Mapped[str] = mapped_column(String(120))
     title: Mapped[str] = mapped_column(String(200))
@@ -375,6 +395,8 @@ class Lesson(Base):
     quarter_boundary_allowed: Mapped[bool] = mapped_column(Boolean, default=False)
     hard_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     notes: Mapped[str] = mapped_column(Text, default="")
+    # curriculum | syllabus | drafted (filled from a placeholder by LessonBridge, needs teacher review) | teacher
+    origin: Mapped[str] = mapped_column(String(32), default="curriculum", server_default=text("'curriculum'"))
 
     unit: Mapped[CurriculumUnit] = relationship(back_populates="lessons")
     dependencies: Mapped[list["LessonDependency"]] = relationship(
@@ -387,6 +409,10 @@ class Lesson(Base):
 
     def allows(self, delivery: str) -> bool:
         return delivery in (self.delivery_requirement or [])
+
+    @property
+    def prerequisite_slugs(self) -> set[str]:
+        return {d.depends_on.slug for d in self.dependencies}
 
 
 class LessonDependency(Base):
@@ -407,7 +433,7 @@ class CalendarEntry(Base):
 
     __tablename__ = "instructional_calendar"
     id: Mapped[int] = mapped_column(primary_key=True)
-    teacher_course_id: Mapped[int] = mapped_column(ForeignKey("teacher_courses.id"))
+    teacher_course_id: Mapped[int] = mapped_column(ForeignKey("teacher_courses.id", ondelete="CASCADE"))
     date: Mapped[date] = mapped_column(Date)
     lesson_id: Mapped[Optional[int]] = mapped_column(ForeignKey("lessons.id"), nullable=True)
     unit_id: Mapped[Optional[int]] = mapped_column(ForeignKey("curriculum_units.id"), nullable=True)
@@ -418,13 +444,25 @@ class CalendarEntry(Base):
     detail_level: Mapped[DetailLevel] = mapped_column(Enum(DetailLevel), default=DetailLevel.lesson)
     origin: Mapped[str] = mapped_column(String(32), default="generated")
     is_sub_day: Mapped[bool] = mapped_column(Boolean, default=False)
-    # Lessons merged into this day (compression) are listed here.
+    # Lessons merged into this day (compression), in teaching order, before the entry's own lesson.
     merged_lesson_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
-    sub_plan_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sub_plans.id", use_alter=True), nullable=True)
+    # Planner identity of merged items, e.g. ["federalism-intro", "launch-annotation#c1"].
+    merged_keys: Mapped[list[Any]] = mapped_column(JSON, default=list, server_default=text("'[]'"))
+    # 0 for the lesson itself; n for its n-th "(continued)" day after a slip.
+    continuation: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    # Which absence made this a substitute day, and which replacement activity it carries.
+    absence_id: Mapped[Optional[int]] = mapped_column(ForeignKey("absence_events.id", ondelete="SET NULL"), nullable=True)
+    replacement_activity_id: Mapped[Optional[int]] = mapped_column(ForeignKey("replacement_activities.id", ondelete="SET NULL"), nullable=True)
+    sub_plan_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sub_plans.id", use_alter=True, ondelete="SET NULL"), nullable=True)
 
     section: Mapped[TeacherCourse] = relationship(back_populates="calendar")
     lesson: Mapped[Optional[Lesson]] = relationship()
     unit: Mapped[Optional[CurriculumUnit]] = relationship()
+    replacement_activity: Mapped[Optional["ReplacementActivity"]] = relationship()
+
+    @property
+    def is_slack(self) -> bool:
+        return self.lesson_id is None and self.kind in (EntryKind.flex, EntryKind.placeholder) and not self.is_sub_day
     __table_args__ = (UniqueConstraint("teacher_course_id", "date", name="uq_calendar_section_date"),)
 
 
@@ -432,7 +470,7 @@ class CalendarEntry(Base):
 class TeacherPreference(Base):
     __tablename__ = "teacher_preferences"
     id: Mapped[int] = mapped_column(primary_key=True)
-    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id"))
+    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id", ondelete="CASCADE"))
     key: Mapped[str] = mapped_column(String(100))
     value: Mapped[str] = mapped_column(Text)
     source: Mapped[str] = mapped_column(String(32), default="onboarding")  # onboarding | correction | inferred
@@ -448,7 +486,7 @@ class TeacherRule(Base):
 
     __tablename__ = "teacher_rules"
     id: Mapped[int] = mapped_column(primary_key=True)
-    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id"))
+    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id", ondelete="CASCADE"))
     scope: Mapped[RuleScope] = mapped_column(Enum(RuleScope), default=RuleScope.teacher)
     scope_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     category: Mapped[str] = mapped_column(String(64), default="procedure")
@@ -465,7 +503,7 @@ class TeacherRule(Base):
 class ReplacementActivity(Base):
     __tablename__ = "replacement_activities"
     id: Mapped[int] = mapped_column(primary_key=True)
-    teacher_id: Mapped[Optional[int]] = mapped_column(ForeignKey("teachers.id"), nullable=True)
+    teacher_id: Mapped[Optional[int]] = mapped_column(ForeignKey("teachers.id", ondelete="CASCADE"), nullable=True)
     subject: Mapped[Subject] = mapped_column(Enum(Subject))
     slug: Mapped[str] = mapped_column(String(100))
     title: Mapped[str] = mapped_column(String(200))
@@ -483,7 +521,7 @@ class ReplacementActivity(Base):
 class AbsenceEvent(Base):
     __tablename__ = "absence_events"
     id: Mapped[int] = mapped_column(primary_key=True)
-    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id"))
+    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id", ondelete="CASCADE"))
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date] = mapped_column(Date)
     absence_type: Mapped[AbsenceType] = mapped_column(Enum(AbsenceType))
@@ -503,9 +541,10 @@ class AbsenceEvent(Base):
 class AbsenceDecision(Base):
     __tablename__ = "absence_decisions"
     id: Mapped[int] = mapped_column(primary_key=True)
-    absence_id: Mapped[int] = mapped_column(ForeignKey("absence_events.id"))
-    calendar_entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("instructional_calendar.id"), nullable=True)
-    lesson_id: Mapped[Optional[int]] = mapped_column(ForeignKey("lessons.id"), nullable=True)
+    absence_id: Mapped[int] = mapped_column(ForeignKey("absence_events.id", ondelete="CASCADE"))
+    calendar_entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("instructional_calendar.id", ondelete="SET NULL"), nullable=True)
+    lesson_id: Mapped[Optional[int]] = mapped_column(ForeignKey("lessons.id", ondelete="SET NULL"), nullable=True)
+    teacher_course_id: Mapped[Optional[int]] = mapped_column(ForeignKey("teacher_courses.id", ondelete="CASCADE"), nullable=True)
     date: Mapped[date] = mapped_column(Date)
     decision: Mapped[Decision] = mapped_column(Enum(Decision))
     rationale: Mapped[str] = mapped_column(Text, default="")
@@ -521,14 +560,21 @@ class Proposal(Base):
 
     __tablename__ = "proposals"
     id: Mapped[int] = mapped_column(primary_key=True)
-    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id"))
-    absence_id: Mapped[Optional[int]] = mapped_column(ForeignKey("absence_events.id"), nullable=True)
-    teacher_course_id: Mapped[Optional[int]] = mapped_column(ForeignKey("teacher_courses.id"), nullable=True)
+    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id", ondelete="CASCADE"))
+    absence_id: Mapped[Optional[int]] = mapped_column(ForeignKey("absence_events.id", ondelete="CASCADE"), nullable=True)
+    teacher_course_id: Mapped[Optional[int]] = mapped_column(ForeignKey("teacher_courses.id", ondelete="CASCADE"), nullable=True)
+    # absence_reconciliation | slip_reconciliation | rebuild | backlog_placement | cancel_absence | undo | curriculum
     kind: Mapped[str] = mapped_column(String(32), default="reconciliation")
     status: Mapped[ProposalStatus] = mapped_column(Enum(ProposalStatus), default=ProposalStatus.pending)
     explanation: Mapped[str] = mapped_column(Text, default="")
     diff: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    # hard, soft, unresolved, decisions_required, violations
     constraints: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    # Lessons this proposal sends to (or takes from) the owed-lesson backlog.
+    backlog: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, server_default=text("'{}'"))
+    window_start: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    window_end: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    reverts_proposal_id: Mapped[Optional[int]] = mapped_column(ForeignKey("proposals.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
@@ -538,9 +584,9 @@ class Proposal(Base):
 class CalendarChange(Base):
     __tablename__ = "calendar_changes"
     id: Mapped[int] = mapped_column(primary_key=True)
-    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id"))
+    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id", ondelete="CASCADE"))
     proposal_id: Mapped[Optional[int]] = mapped_column(ForeignKey("proposals.id"), nullable=True)
-    teacher_course_id: Mapped[int] = mapped_column(ForeignKey("teacher_courses.id"))
+    teacher_course_id: Mapped[int] = mapped_column(ForeignKey("teacher_courses.id", ondelete="CASCADE"))
     change_type: Mapped[str] = mapped_column(String(32))
     date: Mapped[date] = mapped_column(Date)
     before: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
@@ -552,11 +598,13 @@ class CalendarChange(Base):
 class SubPlan(Base):
     __tablename__ = "sub_plans"
     id: Mapped[int] = mapped_column(primary_key=True)
-    absence_id: Mapped[int] = mapped_column(ForeignKey("absence_events.id"))
-    teacher_course_id: Mapped[int] = mapped_column(ForeignKey("teacher_courses.id"))
-    calendar_entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("instructional_calendar.id"), nullable=True)
+    absence_id: Mapped[int] = mapped_column(ForeignKey("absence_events.id", ondelete="CASCADE"))
+    teacher_course_id: Mapped[int] = mapped_column(ForeignKey("teacher_courses.id", ondelete="CASCADE"))
+    calendar_entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("instructional_calendar.id", ondelete="SET NULL"), nullable=True)
     date: Mapped[date] = mapped_column(Date)
     content: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    # Fingerprint of the calendar day the plan was generated for; a mismatch marks the plan stale (LB-37).
+    entry_fingerprint: Mapped[str] = mapped_column(String(64), default="", server_default=text("''"))
     rendered_markdown: Mapped[str] = mapped_column(Text, default="")
     generator: Mapped[str] = mapped_column(String(32), default="template")
     model: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
@@ -573,7 +621,7 @@ class SubPlan(Base):
 class GenerationAttempt(Base):
     __tablename__ = "generation_attempts"
     id: Mapped[int] = mapped_column(primary_key=True)
-    sub_plan_id: Mapped[int] = mapped_column(ForeignKey("sub_plans.id"))
+    sub_plan_id: Mapped[int] = mapped_column(ForeignKey("sub_plans.id", ondelete="CASCADE"))
     attempt_no: Mapped[int] = mapped_column(Integer)
     passed: Mapped[bool] = mapped_column(Boolean, default=False)
     failures: Mapped[list[Any]] = mapped_column(JSON, default=list)
@@ -584,12 +632,42 @@ class GenerationAttempt(Base):
     sub_plan: Mapped[SubPlan] = relationship(back_populates="generation_attempts")
 
 
+class OwedLesson(Base):
+    """A lesson that is owed but has no calendar day: the backlog (LB-01).
+
+    Created when an approved proposal cannot place a lesson (``owed``) or drops
+    optional / recommended content (``dropped``). Owed lessons are offered to the
+    next planning run for the section and to the explicit "schedule owed lessons"
+    action; nothing is ever silently deleted.
+    """
+
+    __tablename__ = "owed_lessons"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    teacher_course_id: Mapped[int] = mapped_column(ForeignKey("teacher_courses.id", ondelete="CASCADE"))
+    lesson_id: Mapped[int] = mapped_column(ForeignKey("lessons.id", ondelete="CASCADE"))
+    key: Mapped[str] = mapped_column(String(160))
+    title: Mapped[str] = mapped_column(String(200))
+    kind: Mapped[str] = mapped_column(String(16), default="owed")  # owed | dropped
+    reason: Mapped[str] = mapped_column(Text, default="")
+    created_by_proposal_id: Mapped[Optional[int]] = mapped_column(ForeignKey("proposals.id", ondelete="SET NULL"), nullable=True)
+    resolved_by_proposal_id: Mapped[Optional[int]] = mapped_column(ForeignKey("proposals.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    section: Mapped[TeacherCourse] = relationship(back_populates="owed")
+    lesson: Mapped[Lesson] = relationship()
+
+    @property
+    def open(self) -> bool:
+        return self.resolved_at is None
+
+
 class LeavePlan(Base):
     """Extended-leave artefacts: pre-leave analysis, handoff packet, weekly frameworks, return brief."""
 
     __tablename__ = "leave_plans"
     id: Mapped[int] = mapped_column(primary_key=True)
-    absence_id: Mapped[int] = mapped_column(ForeignKey("absence_events.id"), unique=True)
+    absence_id: Mapped[int] = mapped_column(ForeignKey("absence_events.id", ondelete="CASCADE"), unique=True)
     pre_leave: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     handoff: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     weekly_frameworks: Mapped[list[Any]] = mapped_column(JSON, default=list)
@@ -604,7 +682,7 @@ class TeacherTouch(Base):
 
     __tablename__ = "teacher_touches"
     id: Mapped[int] = mapped_column(primary_key=True)
-    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id"))
+    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id", ondelete="CASCADE"))
     workflow: Mapped[str] = mapped_column(String(64))
     touch_type: Mapped[str] = mapped_column(String(32))  # field | click | correction | decision | confirmation
     label: Mapped[str] = mapped_column(String(200))

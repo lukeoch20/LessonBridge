@@ -1,0 +1,6 @@
+{% extends "base.html" %}{% block content %}
+<div class="card"><h1 style="margin-top:0">Choose a teacher profile</h1>
+<p class="muted">Several teacher profiles exist; pick the one to work with.</p>
+{% for t in teachers %}<form class="inline" method="post" action="/teachers/select"><input type="hidden" name="teacher_id" value="{{ t.id }}"><button class="secondary" type="submit">{{ t.name }} — {{ t.school.name }}</button></form> {% endfor %}
+</div>
+{% endblock %}

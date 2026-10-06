@@ -1,14 +1,25 @@
 {% extends "base.html" %}{% block content %}
-<div class="card"><h1 style="margin:0">{{ section.section_name }}</h1><div class="muted">{{ start }} to {{ end }} · <a href="?start={{ prev }}">« earlier</a> · <a href="?start={{ next }}">later »</a></div></div>
-<div class="card"><table><tr><th>Date</th><th>Entry</th><th>Unit</th><th>Detail</th><th>Status</th><th>Record</th></tr>
+<div class="card"><h1 style="margin:0">{{ section.section_name }}</h1><div class="muted">{{ start }} to {{ end }} · <a href="?start={{ prev }}">« earlier</a> · <a href="?start={{ next }}">later »</a></div>
+<form class="inline" method="post" action="/calendar/{{ section.id }}/rebuild">Rebuild planned days from <input type="date" name="start" value="{{ start }}" required> <button class="secondary" type="submit">Propose rebuild</button></form>
+<span class="muted small">Completed, skipped and substitute days are kept; you approve the result.</span></div>
+{% if owed %}<div class="card"><h2 style="margin-top:0">Owed lessons</h2><ul>{% for o in owed %}<li>{{ o.title }} <span class="muted">({{ o.kind }}: {{ o.reason }})</span></li>{% endfor %}</ul>
+<form method="post" action="/calendar/{{ section.id }}/owed"><label><input type="checkbox" name="include_dropped" value="1"> include dropped optional lessons</label> <button type="submit">Propose days for them</button></form></div>{% endif %}
+<div class="card"><table><tr><th>Date</th><th>Entry</th><th>Unit</th><th>Status</th><th>Record / edit</th></tr>
 {% for e in entries %}<tr>
 <td>{{ e.date.strftime('%a %b %d') }}</td>
-<td>{{ e.title }} {% if e.is_sub_day %}<span class="badge sub">SUB</span>{% endif %} {% if e.kind.value == 'assessment' %}<span class="badge">assessment</span>{% endif %}{% if e.id in plans %} · <a href="/subplans/{{ plans[e.id] }}">plan</a>{% endif %}{% if e.notes %}<div class="muted" style="font-size:12px">{{ e.notes }}</div>{% endif %}</td>
+<td>{{ e.title }} {% if e.is_sub_day %}<span class="badge sub">SUB</span>{% endif %} {% if e.kind.value == 'assessment' %}<span class="badge">assessment</span>{% endif %}{% if e.lesson and e.lesson.origin == 'drafted' %} <span class="badge warn">drafted</span>{% endif %}
+{% if e.id in plans %} · <a href="/subplans/{{ plans[e.id].id }}">plan</a>{% if plans[e.id].status.value == 'stale' %} <span class="badge warn">stale</span>{% endif %}{% endif %}{% if e.notes %}<div class="muted small">{{ e.notes }}</div>{% endif %}</td>
 <td class="muted">{{ e.unit.title if e.unit else '' }}</td>
-<td class="muted">{{ e.detail_level.value }}</td>
 <td>{% if e.status.value == 'completed' %}<span class="badge ok">completed</span>{% elif e.status.value == 'skipped' %}<span class="badge warn">skipped</span>{% else %}{{ e.status.value }}{% endif %}</td>
 <td>
 <form class="inline" method="post" action="/calendar/{{ section.id }}/mark"><input type="hidden" name="on" value="{{ e.date }}"><select name="status"><option value="completed">completed</option><option value="skipped">skipped</option><option value="planned">planned</option></select> <button class="secondary" type="submit">mark</button></form>
-<form class="inline" method="post" action="/calendar/{{ section.id }}/slip"><input type="hidden" name="on" value="{{ e.date }}"><input type="hidden" name="days" value="1"><button class="secondary" type="submit" title="This lesson needs one more day; propose a repaired schedule">+1 day</button></form>
+{% if e.lesson %}<form class="inline" method="post" action="/calendar/{{ section.id }}/slip"><input type="hidden" name="on" value="{{ e.date }}"><input type="hidden" name="days" value="1"><button class="secondary" type="submit" title="This lesson needs one more day; propose a repaired schedule">+1 day</button></form>{% endif %}
+<details><summary class="small">edit</summary>
+<form method="post" action="/calendar/{{ section.id }}/edit"><input type="hidden" name="on" value="{{ e.date }}"><input name="title" placeholder="new title"> <input name="notes" placeholder="notes" value="{{ e.notes }}"> <button class="secondary" type="submit">save</button></form>
+{% if not e.lesson and e.status.value == 'planned' %}<form method="post" action="/calendar/{{ section.id }}/fill"><input type="hidden" name="on" value="{{ e.date }}">
+<input name="title" placeholder="lesson title" required> <input name="objective" placeholder="objective" required>
+<select name="lesson_type"><option value="guided_practice">guided practice</option><option value="direct_instruction">direct instruction</option><option value="independent_practice">independent practice</option><option value="discussion">discussion</option><option value="writing_workshop">writing workshop</option><option value="reading">reading</option><option value="review">review</option></select>
+<input name="materials" placeholder="materials, comma-separated"> <input name="outputs" placeholder="student outputs"> <button class="secondary" type="submit">fill this day</button></form>{% endif %}
+</details>
 </td></tr>{% endfor %}</table></div>
 {% endblock %}

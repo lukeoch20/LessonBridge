@@ -8,7 +8,6 @@ to type the dates.
 from __future__ import annotations
 
 import json
-from datetime import date
 from importlib import resources
 from typing import Any
 
@@ -24,6 +23,15 @@ LIVE_URLS = {
     "curriculum_civics": "https://www.lcps.org/academics/social-science",
     "assessment_calendar": "https://www.lcps.org/assessment",
 }
+
+
+def _useful_text(text: str) -> bool:
+    """A live page is worth indexing only if it extracted real text (not a JS shell or an error marker)."""
+    t = (text or "").strip()
+    if t.startswith("[extraction failed") or len(t) < 300:
+        return False
+    words = t.split()
+    return len(words) >= 50 and sum(w.isalpha() for w in words) / len(words) > 0.5
 
 
 def _load(name: str) -> dict[str, Any]:
@@ -59,13 +67,11 @@ class LoudounCountyProvider(DistrictProvider):
         payload = self._snapshot_payload(desc)
         if allow_network and desc.url:
             live = self._try_live(desc)
-            if live is not None:
-                # Keep the structured snapshot (it is what the planner consumes) but
-                # attach the live text so it is indexed and searchable, and so a
-                # later LLM extraction pass can reconcile the two.
-                payload.text = live["text"] or payload.text
-                payload.raw_bytes = live["raw"]
-                payload.content_type = live["content_type"]
+            if live is not None and _useful_text(live["text"]):
+                # Keep the structured snapshot (it is what the planner consumes) and index the
+                # snapshot text together with the live text, so a thin or broken live page never
+                # hides the snapshot from search (LB-60).
+                payload.text = payload.text + "\n\n[live page]\n" + live["text"]
                 payload.origin = "live"
                 payload.notes = "Live document retrieved; structured dates still come from the snapshot until confirmed."
         return payload
@@ -147,6 +153,3 @@ class LoudounCountyProvider(DistrictProvider):
 
     def get_schools(self) -> list[dict]:
         return list(self._schools["schools"])
-
-    def school_year_for(self, d: date) -> str:
-        return f"{d.year}-{d.year + 1}" if d.month >= 7 else f"{d.year - 1}-{d.year}"

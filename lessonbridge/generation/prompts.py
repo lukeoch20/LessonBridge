@@ -21,4 +21,6 @@ CONTEXT_EXTRACT_SYSTEM = """You read a teacher's syllabus or pacing guide for a 
 Extract only what the document says; do not invent units, dates or rules. Rules are mandatory classroom procedures (for example "students get 15 minutes to study before quizzes"). Preferences are softer stated tendencies.
 For each unit give a short slug, title, quarter if stated, planned days if stated or inferable from weeks (5 class days per week), and the standards codes mentioned."""
 
-EXPLAIN_SYSTEM = """You explain a proposed instructional-calendar change to a busy teacher in under 120 words. Be concrete about what moved and why; never hide a tradeoff."""
+DRAFT_LESSON_SYSTEM = """You draft one lesson for a 7th-grade class in Virginia that fills a "lesson to be detailed" day inside a unit.
+You receive the unit, the lesson before and after the day, and the materials the unit already uses. Return a single practice or extension lesson that builds on the previous lesson.
+Use only the listed materials. Do not create a test, quiz or graded assessment. Keep the title short."""
